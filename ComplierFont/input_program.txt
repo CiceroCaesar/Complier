@@ -1,6 +1,6 @@
 int a;
 int b;
-
+// function
 int program(int a,int b,int c)
 {
     int i;
@@ -27,6 +27,9 @@ int demo(int a)
     return a * 2;
 }
 
+/*
+    main functon
+*/
 void main(void)
 {
     int a;

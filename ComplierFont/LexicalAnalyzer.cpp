@@ -1,4 +1,5 @@
 #include "LexicalAnalyzer.h"
+/// @brief 静态成员要在cpp内类外初始化
 std::string LexicalAnalyzer::peek_str_ = "";
 int LexicalAnalyzer::row_ = 1;
 int LexicalAnalyzer::column_ = 0;
@@ -10,7 +11,7 @@ LexicalAnalyzer::LexicalAnalyzer()
 	if (!if_stream_.is_open())
 	{
 		std::cerr << kOpenFileFailed << kInputProgramFileName << '\n';
-		exit(-1);
+		exit(kOpenFileFailedCode);
 	}
 	col_num_of_line_.emplace_back(column_);
 }
@@ -61,12 +62,12 @@ LexicalUnit LexicalAnalyzer::Scan()
 			}
 		}
 	}
-	/// @brief 赋值号
-	else if ('=' == peek_)
-	{
-		peek_str_ = peek_;
-		AddSymbol();
-	}
+	///// @brief 赋值号 //这边暂时我没想明白赋值等号和算符等号的区别
+	//else if ('=' == peek_)
+	//{
+	//	peek_str_ = peek_;
+	//	AddSymbol();
+	//}
 	/// @brief 只有1个字符的词素及其词法单元
 	else if (('+' == peek_) || ('-' == peek_) || ('*' == peek_) ||
 		('/' == peek_) || ('=' == peek_) || ('>' == peek_) ||
@@ -105,13 +106,19 @@ LexicalUnit LexicalAnalyzer::Scan()
 		peek_str_ = "!=";
 		AddSymbol();
 	}
+	/// @brief 单词的首字母不合法
+	else
+	{
+		std::cout << kLexBeginErr << "row: " << row_ << " column: " << column_ << '\n';
+		exit(kLexBeginErrCode);
+	}
 	return symbol_table_.back();
 }
 
 void LexicalAnalyzer::ReadCh()
 {
 	/// @brief 读字符，存于peek_
-	peek_ = if_stream_.get();
+	peek_ = static_cast<char>(if_stream_.get());
 	/// @brief 读换行符
 	if ('\n' == peek_)
 	{
@@ -137,11 +144,16 @@ void LexicalAnalyzer::ReadCh()
 		col_num_of_line_[static_cast<long long>(row_) - 1] = column_;
 	}
 	//否则，若读到文件尾，无处理，自动结束（可加输出提示）
+	else if(EOF == peek_)
+	{
+		std::cout << kReadEOF;
+	}
 	
 }
 
 void LexicalAnalyzer::FilterComSpace()
 {
+	bool cross_line_com_end = true;
 	/// @brief 注释字符串的长度，用于错误处理
 	int com_ch_num = 0;
 	/// @brief 此版本未将注释存入任何一个符号表中，即直接过滤
@@ -161,8 +173,8 @@ void LexicalAnalyzer::FilterComSpace()
 			/// @brief 不满足两种注释的部分要求// 和 /*
 			if (('/' != peek_) && ('*' != peek_))
 			{
-				/// @brief 回退1个字符
-				BackCh(1);
+				/// @brief 回退2个字符
+				BackCh(2);
 				/// @brief 直接退出，结束此次过滤
 				return;
 			}
@@ -173,7 +185,8 @@ void LexicalAnalyzer::FilterComSpace()
 				do
 				{
 					ReadCh();
-				} while ('\n' == peek_);
+				} while ('\n' != if_stream_.peek());
+				/// @brief 不直接退出，而是继续外部的大循环，因为可能还有注释
 				AddSymbol(lexical_unit_morpheme_umap.at("//"), "//");
 
 			}
@@ -181,6 +194,8 @@ void LexicalAnalyzer::FilterComSpace()
 			else if ('*' == peek_)
 			{
 				++com_ch_num;
+				/// @brief 标志置false，代表/**/注释开始未结束
+				cross_line_com_end = false;
 				do
 				{
 					ReadCh();
@@ -195,9 +210,11 @@ void LexicalAnalyzer::FilterComSpace()
 						if ('/' == peek_)
 						{
 							AddSymbol(lexical_unit_morpheme_umap.at("/**/"), "/**/");
+							cross_line_com_end = true;
+							break;//此次注释扫描完，跳出小循环，进入大循环，看相邻是否还有注释
 						}
 					}
-				} while (true);
+				} while (EOF != peek_);
 			}
 		}
 		/// @brief 既不是空白符也不是单斜线，则回退1字符，直接结束此次过滤
@@ -206,7 +223,13 @@ void LexicalAnalyzer::FilterComSpace()
 			BackCh(1);
 			return;
 		}
-	} while (true);
+	} while (EOF != peek_);
+	/// @brief 直到文件结束/**/注释也美匹配到结束自己注释的结束符，则报错退出
+	if(!cross_line_com_end)
+	{
+		std::cout << kLexCrossComNotEnd << "row: " << row_ << " column: " << column_ << '\n';
+		exit(-kLexCrossComNotEndCode);
+	}
 }
 
 void LexicalAnalyzer::BackCh(const int back_ch_num)
@@ -216,7 +239,7 @@ void LexicalAnalyzer::BackCh(const int back_ch_num)
 	{
 		if_stream_.seekg(-1, std::ios::cur);
 		--column_;
-		peek_ = if_stream_.peek();
+		peek_ = static_cast<char>(if_stream_.peek());
 		/// @brief 回退时遇到换行符要处理当前指针位于的行数和列数
 		if('\n' == peek_)
 		{

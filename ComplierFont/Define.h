@@ -31,3 +31,14 @@ const std::unordered_map<std::string, std::string> lexical_unit_morpheme_umap
 	{"{", "BigLeftParentheses: {"}, {"}", "BigRightParentheses: }"}, {"Letter", "Letter"},
 	{"Digit", "Digit"}, {"#", "EndSymbol: #"}
 };
+
+const enum ExitCode
+{
+	kOpenFileFailedCode = 1, kLexBeginErrCode, kLexCrossComNotEndCode
+};
+
+const std::string kReadEOF = "The end of file is read, the reading process ends.\n";
+/// @brief 词法分析时词素的首字母不合法
+const std::string kLexBeginErr = "The first letter of the word is not a character that should appear. ";
+/// @brief 词法分析时/**/注释未结束
+const std::string kLexCrossComNotEnd = "The comment '/**/' has no terminator '*/'. ";
